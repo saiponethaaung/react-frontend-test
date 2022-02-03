@@ -12,6 +12,9 @@ import {
     validateCardNumber,
     formatCardNumber,
     formatCardExpiry,
+    parseCardType,
+    parseCardExpiry,
+    validateCardCVC,
 } from "creditcardutils"
 
 // Styled Elements
@@ -26,6 +29,10 @@ import {
     Form,
     FieldGroups,
     FieldsMerge,
+    CardType,
+    CardTypeRow,
+    CardInputCon,
+    PayButton,
 } from "./index.styled"
 
 type TypeCheckoutFormDefaultValues = {
@@ -33,6 +40,7 @@ type TypeCheckoutFormDefaultValues = {
     card_number: string | null
     card_expire: string | null
     cvv: string | null
+    card_type: string | null
 }
 
 export type TypeCheckoutFormValues = NonNullable<TypeCheckoutFormDefaultValues>
@@ -48,6 +56,7 @@ const defaultState: TypeCheckoutFormDefaultValues = {
     card_number: null,
     card_expire: null,
     cvv: null,
+    card_type: null,
 }
 
 const CheckoutForm: FC<CheckoutFormProps> = ({
@@ -78,6 +87,10 @@ const CheckoutForm: FC<CheckoutFormProps> = ({
                         if (!validateCardNumber(value)) {
                             return helpers.error("string.cardNumber")
                         }
+
+                        if (models.card_type === null) {
+                            return helpers.error("string.cardType")
+                        }
                     }
 
                     return value
@@ -86,17 +99,48 @@ const CheckoutForm: FC<CheckoutFormProps> = ({
                 .messages({
                     "string.empty": "Required",
                     "string.cardNumber": "Must be a valid card",
+                    "string.cardType": "Must be a visa or master",
                     "any.required": "Required",
                 }),
-            card_expire: Joi.string().required().messages({
-                "string.empty": "Required",
-                "any.required": "Required",
-            }),
-            cvv: Joi.string().length(3).required().messages({
-                "string.empty": "Required",
-                "string.length": "Maximum 3 digits",
-                "any.required": "Required",
-            }),
+            card_expire: Joi.string()
+                .custom((value, helpers) => {
+                    if (value) {
+                        let my = parseCardExpiry(value);
+                        
+                        if (my.month > 12 || my.month < new Date().getMonth() + 1) {
+                            return helpers.error("string.month");
+                        }
+                        if (isNaN(my.year) || my.year < new Date().getFullYear()) {
+                            return helpers.error("string.year");
+                        }
+                    }
+
+                    return value
+                }).required()
+                .messages({
+                    "string.empty": "Required",
+                    "string.month": "Invalid expire month",
+                    "string.year": "Invalid expire year",
+                    "any.required": "Required",
+                }),
+            cvv: Joi.string()
+                .custom((value, helpers) => {
+                    if (value) {
+                        if (!validateCardCVC(value, models.card_type)) {
+                            return helpers.error("string.invalid");
+                        }
+                    }
+
+                    return value
+                })
+                .length(3)
+                .required()
+                .messages({
+                    "string.invalid": "Invalid cvc",
+                    "string.empty": "Required",
+                    "string.length": "Maximum 3 digits",
+                    "any.required": "Required",
+                }),
         }),
     })
 
@@ -118,7 +162,16 @@ const CheckoutForm: FC<CheckoutFormProps> = ({
     const formatter = {
         cardNumber: (e: ChangeEvent<HTMLInputElement>) => {
             const value = formatCardNumber(e.target.value)
+            let cardType = null
+            let pct = parseCardType(value)
 
+            if (pct === 'visa') {
+                cardType = "visa";
+            } else if (pct === 'mastercard') {
+                cardType = "mastercard"
+            }
+
+            updateModel("card_type", cardType)
             updateModel("card_number", value)
         },
         cardExpire: (e: ChangeEvent<HTMLInputElement>) => {
@@ -161,15 +214,26 @@ const CheckoutForm: FC<CheckoutFormProps> = ({
                             <FieldLabel error={!!getErrors("card_number")}>
                                 Card information
                             </FieldLabel>
-
-                            <Input
-                                {...register.input({
-                                    name: "card_number",
-                                    onChange: formatter.cardNumber,
-                                })}
-                                type="text"
-                                placeholder="1234 1234 1234 1234"
-                            />
+                            <CardInputCon>
+                                <Input
+                                    {...register.input({
+                                        name: "card_number",
+                                        onChange: formatter.cardNumber,
+                                    })}
+                                    type="text"
+                                    placeholder="1234 1234 1234 1234"
+                                />
+                                <CardTypeRow>
+                                    <CardType
+                                        active={models.card_type === 'visa'}
+                                        src="/visa.png"
+                                    />
+                                    <CardType
+                                        active={models.card_type === 'mastercard'}
+                                        src="/master.png"
+                                    />
+                                </CardTypeRow>
+                            </CardInputCon>
                         </FieldControl>
 
                         {getErrors("card_number") && (
@@ -212,9 +276,11 @@ const CheckoutForm: FC<CheckoutFormProps> = ({
                 </FieldGroups>
 
                 <Actions>
-                    <button disabled={state.$auto_invalid || loading}>
+                    <PayButton
+                        disabled={state.$auto_invalid || loading}
+                    >
                         {submitText}
-                    </button>
+                    </PayButton>
                 </Actions>
             </Form>
         </Container>

@@ -98,3 +98,40 @@ export const Actions = styled.article`
 `
 
 export const Fields = styled.article.attrs(() => ({ className: "fields" }))``
+
+type CardTypeProps = {
+    active?: boolean
+    src: string
+}
+
+export const CardType = styled.img.attrs((props: CardTypeProps) => ({
+    src: props.src
+}))`
+    opacity: ${({ active = false }: CardTypeProps) => active ? 1 : 0.5};
+    margin-left: 5px;
+    height: 40px;
+`
+
+export const CardInputCon = styled.div`
+    position: relative;
+`
+
+export const CardTypeRow = styled.div`
+    position: absolute;
+    bottom: -5px;
+    right: 10px;
+`
+
+type PayButtonProps = {
+    disabled: boolean
+}
+
+export const PayButton = styled.button.attrs((props: PayButtonProps) => ({
+    disabled: props.disabled
+}))`
+    color: #fff;
+    background: var(--dorminant_1);
+    border: var(--dorminant_1);
+    border-radius: 5px;
+    padding: 12px 30px;
+`
